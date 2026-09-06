@@ -31,8 +31,7 @@ jobs:
         run: |
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           rm -rf ~/Library/Caches/com.apple.dt.Xcode
-          xcode-select --reset
-          
+
       # 4. Verify Project Structure
       - name: Verify Project Structure
         run: |
