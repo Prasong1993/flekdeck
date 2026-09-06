@@ -1,0 +1,116 @@
+# .github/workflows/build-flekdeck.yml
+name: Build FlekDeck IPA
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # ให้สามารถ trigger ด้วยมือได้
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      # 1. Checkout repository พร้อม submodules
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # 2. ตั้งค่า Xcode version
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.0'
+
+      # 3. ติดตั้ง Dependencies (ถ้ามี CocoaPods/SPM)
+      - name: Install Dependencies
+        run: |
+          # ถ้าใช้ CocoaPods
+          if [ -f "Podfile" ]; then
+            gem install cocoapods
+            pod install
+          fi
+
+          # ติดตั้ง tools ที่จำเป็น
+          brew install ldid
+          brew install make
+
+      # 4. Build โปรเจกต์แบบไม่ sign (unsigned)
+      - name: Build FlekDeck
+        run: |
+          # ตรวจสอบว่าใช้ xcworkspace หรือ xcodeproj
+          if [ -f "*.xcworkspace" ]; then
+            WORKSPACE=$(ls *.xcworkspace | head -1)
+            xcodebuild -workspace "$WORKSPACE" \
+              -scheme "FlekDeck" \
+              -sdk iphoneos \
+              -configuration Release \
+              -archivePath $RUNNER_TEMP/FlekDeck.xcarchive \
+              -destination "generic/platform=iOS" \
+              archive \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              DEVELOPMENT_TEAM="" \
+              AD_HOC_CODE_SIGNING_ALLOWED=YES
+          else
+            PROJECT=$(ls *.xcodeproj | head -1)
+            xcodebuild -project "$PROJECT" \
+              -scheme "FlekDeck" \
+              -sdk iphoneos \
+              -configuration Release \
+              -archivePath $RUNNER_TEMP/FlekDeck.xcarchive \
+              -destination "generic/platform=iOS" \
+              archive \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              DEVELOPMENT_TEAM="" \
+              AD_HOC_CODE_SIGNING_ALLOWED=YES
+          fi
+
+      # 5. สร้าง Payload และ pack เป็น IPA
+      - name: Create IPA
+        run: |
+          ARCHIVE_PATH="$RUNNER_TEMP/FlekDeck.xcarchive"
+          APP_PATH=$(find "$ARCHIVE_PATH/Products/Applications" -name "*.app" -maxdepth 1 | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ ไม่พบ .app ใน archive"
+            exit 1
+          fi
+
+          echo "✅ พบแอป: $APP_PATH"
+
+          # สร้างโครงสร้าง Payload
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -r "$APP_PATH" "$RUNNER_TEMP/Payload/"
+
+          # Pack เป็น IPA
+          cd "$RUNNER_TEMP"
+          zip -r -9 "FlekDeck.ipa" Payload
+
+          echo "✅ สร้าง IPA สำเร็จ!"
+          ls -lh "$RUNNER_TEMP/FlekDeck.ipa"
+
+      # 6. Upload IPA เป็น artifact
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlekDeck-IPA
+          path: ${{ runner.temp }}/FlekDeck.ipa
+          retention-days: 30
+
+      # 7. (Optional) สร้าง Release อัตโนมัติ เมื่อ push tag
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/FlekDeck.ipa
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
