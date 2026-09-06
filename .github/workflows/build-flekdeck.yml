@@ -42,9 +42,11 @@ jobs:
       # 4. Build โปรเจกต์แบบไม่ sign (unsigned)
       - name: Build FlekDeck
         run: |
-          # ตรวจสอบว่าใช้ xcworkspace หรือ xcodeproj
-          if [ -f "*.xcworkspace" ]; then
-            WORKSPACE=$(ls *.xcworkspace | head -1)
+          # หาไฟล์ xcworkspace หรือ xcodeproj
+          WORKSPACE=$(ls -d *.xcworkspace 2>/dev/null | head -1)
+          PROJECT=$(ls -d *.xcodeproj 2>/dev/null | head -1)
+          
+          if [ -n "$WORKSPACE" ]; then
             xcodebuild -workspace "$WORKSPACE" \
               -scheme "FlekDeck" \
               -sdk iphoneos \
@@ -57,8 +59,7 @@ jobs:
               CODE_SIGNING_ALLOWED=NO \
               DEVELOPMENT_TEAM="" \
               AD_HOC_CODE_SIGNING_ALLOWED=YES
-          else
-            PROJECT=$(ls *.xcodeproj | head -1)
+          elif [ -n "$PROJECT" ]; then
             xcodebuild -project "$PROJECT" \
               -scheme "FlekDeck" \
               -sdk iphoneos \
@@ -71,6 +72,9 @@ jobs:
               CODE_SIGNING_ALLOWED=NO \
               DEVELOPMENT_TEAM="" \
               AD_HOC_CODE_SIGNING_ALLOWED=YES
+          else
+            echo "❌ ไม่พบไฟล์ .xcworkspace หรือ .xcodeproj"
+            exit 1
           fi
 
       # 5. สร้าง Payload และ pack เป็น IPA
