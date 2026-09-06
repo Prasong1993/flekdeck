@@ -32,17 +32,7 @@ jobs:
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           rm -rf ~/Library/Caches/com.apple.dt.Xcode
 
-      # 4. Verify Project Structure
-      - name: Verify Project Structure
-        run: |
-          PROJECT=$(ls -d *.xcodeproj 2>/dev/null | head -1)
-          if [ -z "$PROJECT" ]; then
-            echo "❌ ไม่พบ .xcodeproj"
-            exit 1
-          fi
-          echo "✅ พบ: $PROJECT"
-
-      # 5. ติดตั้ง Dependencies (ถ้ามี CocoaPods/SPM)
+      # 4. ติดตั้ง Dependencies (ถ้ามี CocoaPods/SPM)
       - name: Install Dependencies
         run: |
           # ถ้าใช้ CocoaPods
@@ -55,48 +45,27 @@ jobs:
           brew install ldid
           brew install make
 
-      # 6. Build โปรเจกต์แบบไม่ sign (unsigned)
-      - name: Build FlekDeck
+      # 5. Build โปรเจกต์แบบไม่ sign (unsigned)
+      - name: Build LiveContainer
         run: |
-          # หาไฟล์ xcworkspace หรือ xcodeproj
-          WORKSPACE=$(ls -d *.xcworkspace 2>/dev/null | head -1)
-          PROJECT=$(ls -d *.xcodeproj 2>/dev/null | head -1)
-          
-          if [ -n "$WORKSPACE" ]; then
-            xcodebuild -workspace "$WORKSPACE" \
-              -scheme "FlekDeck" \
-              -sdk iphoneos \
-              -configuration Release \
-              -archivePath $RUNNER_TEMP/FlekDeck.xcarchive \
-              -destination "generic/platform=iOS" \
-              archive \
-              CODE_SIGN_IDENTITY="" \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGNING_ALLOWED=NO \
-              DEVELOPMENT_TEAM="" \
-              AD_HOC_CODE_SIGNING_ALLOWED=YES
-          elif [ -n "$PROJECT" ]; then
-            xcodebuild -project "$PROJECT" \
-              -scheme "FlekDeck" \
-              -sdk iphoneos \
-              -configuration Release \
-              -archivePath $RUNNER_TEMP/FlekDeck.xcarchive \
-              -destination "generic/platform=iOS" \
-              archive \
-              CODE_SIGN_IDENTITY="" \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGNING_ALLOWED=NO \
-              DEVELOPMENT_TEAM="" \
-              AD_HOC_CODE_SIGNING_ALLOWED=YES
-          else
-            echo "❌ ไม่พบไฟล์ .xcworkspace หรือ .xcodeproj"
-            exit 1
-          fi
+          PROJECT="LiveContainer.xcodeproj"
+          xcodebuild -project "$PROJECT" \
+            -scheme "LiveContainer" \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/LiveContainer.xcarchive \
+            -destination "generic/platform=iOS" \
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      # 7. สร้าง Payload และ pack เป็น IPA
+      # 6. สร้าง Payload และ pack เป็น IPA
       - name: Create IPA
         run: |
-          ARCHIVE_PATH="$RUNNER_TEMP/FlekDeck.xcarchive"
+          ARCHIVE_PATH="$RUNNER_TEMP/LiveContainer.xcarchive"
           APP_PATH=$(find "$ARCHIVE_PATH/Products/Applications" -name "*.app" -maxdepth 1 | head -1)
 
           if [ -z "$APP_PATH" ]; then
@@ -117,7 +86,7 @@ jobs:
           echo "✅ สร้าง IPA สำเร็จ!"
           ls -lh "$RUNNER_TEMP/FlekDeck.ipa"
 
-      # 8. Upload IPA เป็น artifact
+      # 7. Upload IPA เป็น artifact
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -125,7 +94,7 @@ jobs:
           path: ${{ runner.temp }}/FlekDeck.ipa
           retention-days: 30
 
-      # 9. (Optional) สร้าง Release อัตโนมัติ เมื่อ push tag
+      # 8. (Optional) สร้าง Release อัตโนมัติ เมื่อ push tag
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
