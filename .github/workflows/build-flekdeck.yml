@@ -24,7 +24,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.0'
+          xcode-version: '15.2'
 
       # 3. ติดตั้ง Dependencies (ถ้ามี CocoaPods/SPM)
       - name: Install Dependencies
